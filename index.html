@@ -3,34 +3,63 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIE 201 Horizon</title>
+    <title>MIE 201 - Miller Horizon</title>
     <style>
-        body { margin: 0; background-color: #020205; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; background-color: #020205; overflow: hidden; font-family: 'Segoe UI', sans-serif; color: white; }
         canvas { display: block; }
         
+        /* Main Title Overlay */
         #ui {
-            position: absolute; top: 40%; left: 50%;
+            position: absolute; top: 35%; left: 50%;
             transform: translate(-50%, -50%);
-            text-align: center; color: white;
-            pointer-events: none; z-index: 10;
+            text-align: center; pointer-events: none; z-index: 10;
         }
-        h1 { font-size: clamp(4rem, 12vw, 8rem); margin: 0; letter-spacing: 20px; font-weight: 900; 
-             background: linear-gradient(to bottom, #fff, #666); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        p { font-size: 1.1rem; letter-spacing: 8px; text-transform: uppercase; opacity: 0.5; margin-top: -10px; }
+        h1 { font-size: clamp(3rem, 10vw, 7rem); margin: 0; letter-spacing: 15px; font-weight: 900; 
+             background: linear-gradient(to bottom, #fff, #555); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        #mode-display { font-size: 1.5rem; color: #3498db; letter-spacing: 5px; text-transform: uppercase; margin-top: 10px; height: 30px; }
+
+        /* Keyboard Instruction UI */
+        #controls-ui {
+            position: absolute; bottom: 20px; left: 20px;
+            display: flex; gap: 20px; align-items: flex-end;
+            background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px);
+        }
+        .key-group { display: grid; grid-template-columns: repeat(3, 30px); gap: 5px; }
+        .key { width: 30px; height: 30px; border: 1px solid #666; border-radius: 4px; 
+               display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #aaa; }
+        .key.active { background: #3498db; color: white; border-color: #3498db; }
+        .label { font-size: 0.6rem; text-transform: uppercase; color: #666; margin-top: 5px; text-align: center; }
     </style>
 </head>
 <body>
 
     <div id="ui">
         <h1>MIE 201</h1>
-        <p>Mechanical & Industrial Engineering</p>
+        <div id="mode-display">Bulk Crystal</div>
+    </div>
+
+    <div id="controls-ui">
+        <div>
+            <div class="key-group">
+                <div></div><div id="key-W" class="key">W</div><div></div>
+                <div id="key-A" class="key">A</div><div id="key-S" class="key">S</div><div id="key-D" class="key">D</div>
+            </div>
+            <div class="label">Navigate</div>
+        </div>
+        <div>
+            <div class="key-group">
+                <div id="key-1" class="key">1</div><div id="key-2" class="key">2</div><div id="key-3" class="key">3</div>
+            </div>
+            <div class="label">Miller Planes</div>
+        </div>
     </div>
 
     <script type="module">
         import * as THREE from 'https://esm.sh/three@0.160.0';
 
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x020205, 0.15); // Adds the "Infinite" fading effect
+        scene.fog = new THREE.FogExp2(0x020205, 0.12);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -38,89 +67,140 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // Lighting - High contrast "Lab" style
-        const pLight = new THREE.PointLight(0xffffff, 50, 100);
-        pLight.position.set(0, 10, 0);
-        scene.add(pLight);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+        const light = new THREE.DirectionalLight(0xffffff, 2);
+        light.position.set(5, 10, 5);
+        scene.add(light, new THREE.AmbientLight(0xffffff, 0.3));
 
-        // Lattice Settings: 30x30 = 900 Unit Cells
-        const grid = 30; 
-        const atomGeom = new THREE.SphereGeometry(0.1, 12, 12);
-        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 50 });
-        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 50 });
+        // Grid Settings
+        const grid = 20; 
+        const atomGeom = new THREE.SphereGeometry(0.12, 16, 16);
+        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, transparent: true });
+        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, transparent: true });
 
-        // Instancing for performance (approx 12,000 atoms)
-        const corners = new THREE.InstancedMesh(atomGeom, blueMat, (grid+1)**2 * 2);
-        const faces = new THREE.InstancedMesh(atomGeom, redMat, grid**2 * 3);
-        
-        let cIdx = 0, fIdx = 0;
-        const dummy = new THREE.Object3D();
+        const corners = new THREE.InstancedMesh(atomGeom, blueMat, (grid+1)**2 * 3);
+        const faces = new THREE.InstancedMesh(atomGeom, redMat, grid**2 * 10);
+        const latticeGroup = new THREE.Group();
+        latticeGroup.add(corners, faces);
+        scene.add(latticeGroup);
 
-        for (let x = 0; x <= grid; x++) {
-            for (let z = 0; z <= grid; z++) {
-                // Ground layer + One layer up
-                for (let y = 0; y <= 1; y++) {
-                    dummy.position.set(x, y, z);
-                    dummy.updateMatrix();
-                    corners.setMatrixAt(cIdx++, dummy.matrix);
+        const atomPositions = [];
 
-                    if (x < grid && y < 1) {
-                        dummy.position.set(x + 0.5, y + 0.5, z);
+        function buildLattice() {
+            let cIdx = 0, fIdx = 0;
+            const dummy = new THREE.Object3D();
+
+            for (let x = 0; x <= grid; x++) {
+                for (let z = 0; z <= grid; z++) {
+                    for (let y = 0; y <= 2; y++) {
+                        // Corners
+                        dummy.position.set(x, y, z);
                         dummy.updateMatrix();
-                        faces.setMatrixAt(fIdx++, dummy.matrix);
-                    }
-                    if (z < grid && y < 1) {
-                        dummy.position.set(x, y + 0.5, z + 0.5);
-                        dummy.updateMatrix();
-                        faces.setMatrixAt(fIdx++, dummy.matrix);
-                    }
-                    if (x < grid && z < grid) {
-                        dummy.position.set(x + 0.5, y, z + 0.5);
-                        dummy.updateMatrix();
-                        faces.setMatrixAt(fIdx++, dummy.matrix);
+                        corners.setMatrixAt(cIdx++, dummy.matrix);
+                        atomPositions.push({ type: 'corner', id: cIdx - 1, x, y, z });
+
+                        // Faces
+                        if (x < grid && y < 2) {
+                            dummy.position.set(x + 0.5, y + 0.5, z);
+                            dummy.updateMatrix();
+                            faces.setMatrixAt(fIdx++, dummy.matrix);
+                            atomPositions.push({ type: 'face', id: fIdx - 1, x: x + 0.5, y: y + 0.5, z });
+                        }
+                        if (z < grid && y < 2) {
+                            dummy.position.set(x, y + 0.5, z + 0.5);
+                            dummy.updateMatrix();
+                            faces.setMatrixAt(fIdx++, dummy.matrix);
+                            atomPositions.push({ type: 'face', id: fIdx - 1, x, y: y + 0.5, z: z + 0.5 });
+                        }
+                        if (x < grid && z < grid) {
+                            dummy.position.set(x + 0.5, y, z + 0.5);
+                            dummy.updateMatrix();
+                            faces.setMatrixAt(fIdx++, dummy.matrix);
+                            atomPositions.push({ type: 'face', id: fIdx - 1, x: x + 0.5, y, z: z + 0.5 });
+                        }
                     }
                 }
             }
         }
-        scene.add(corners, faces);
+        buildLattice();
 
-        // Camera Setup (Low Horizon)
-        camera.position.set(grid/2, 1.5, grid/2 + 5);
-        camera.lookAt(grid/2, 0.5, grid/2 - 10);
+        // Miller Index Logic
+        const highlightColor = new THREE.Color(0xf1c40f); // Gold highlight
+        const normalBlue = new THREE.Color(0x3498db);
+        const normalRed = new THREE.Color(0xe74c3c);
 
-        // Smooth "Drone" Controls
+        function setMillerMode(mode) {
+            const display = document.getElementById('mode-display');
+            
+            atomPositions.forEach(atom => {
+                let active = false;
+                if (mode === 1) { // (100) Plane
+                    if (Math.abs(atom.x % 1) < 0.01) active = true;
+                    display.innerText = "(100) Planes";
+                } else if (mode === 2) { // (110) Plane
+                    if (Math.abs((atom.x + atom.z) % 1) < 0.01) active = true;
+                    display.innerText = "(110) Planes";
+                } else if (mode === 3) { // (111) Plane
+                    if (Math.abs((atom.x + atom.y + atom.z) % 1) < 0.01) active = true;
+                    display.innerText = "(111) Planes";
+                } else {
+                    display.innerText = "Bulk Crystal";
+                }
+
+                const mesh = atom.type === 'corner' ? corners : faces;
+                const color = active ? highlightColor : (atom.type === 'corner' ? normalBlue : normalRed);
+                mesh.setColorAt(atom.id, color);
+                // mesh.instanceMatrix.needsUpdate = true; // Not needed for color
+            });
+            corners.instanceColor.needsUpdate = true;
+            faces.instanceColor.needsUpdate = true;
+        }
+
+        // Random Init
+        latticeGroup.rotation.y = Math.random() * Math.PI * 2;
+        setMillerMode(Math.floor(Math.random() * 4));
+
+        // Interaction
         const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (['Digit1', 'Numpad1'].includes(e.code)) setMillerMode(1);
+            if (['Digit2', 'Numpad2'].includes(e.code)) setMillerMode(2);
+            if (['Digit3', 'Numpad3'].includes(e.code)) setMillerMode(3);
+            if (['Digit0', 'Numpad0'].includes(e.code)) setMillerMode(0);
+            
+            const keyEl = document.getElementById('key-' + e.key.toUpperCase()) || document.getElementById('key-' + e.key);
+            if (keyEl) keyEl.classList.add('active');
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+            const keyEl = document.getElementById('key-' + e.key.toUpperCase()) || document.getElementById('key-' + e.key);
+            if (keyEl) keyEl.classList.remove('active');
+        });
+
         const velocity = new THREE.Vector3();
-        window.addEventListener('keydown', (e) => keys[e.code] = true);
-        window.addEventListener('keyup', (e) => keys[e.code] = false);
+        camera.position.set(grid/2, 2, grid/2 + 5);
+        camera.lookAt(grid/2, 0, grid/2 - 5);
 
         function animate() {
             requestAnimationFrame(animate);
-
-            // Flyover Movement Logic
             if (keys['KeyW'] || keys['ArrowUp']) velocity.z -= 0.005;
             if (keys['KeyS'] || keys['ArrowDown']) velocity.z += 0.005;
             if (keys['KeyA'] || keys['ArrowLeft']) velocity.x -= 0.005;
             if (keys['KeyD'] || keys['ArrowRight']) velocity.x += 0.005;
-
-            // Apply friction/damping
+            
             velocity.multiplyScalar(0.95);
             camera.position.add(velocity);
-
-            // Subtle "Breathing" camera movement
-            camera.position.y = 1.5 + Math.sin(Date.now() * 0.001) * 0.1;
-
+            
+            latticeGroup.rotation.y += 0.0005;
             renderer.render(scene, camera);
         }
+        animate();
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
-
-        animate();
     </script>
 </body>
 </html>
