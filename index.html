@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIE 201 - Materials Hero V3</title>
+    <title>MIE 201 - Pure Chroma Horizon</title>
     <style>
-        body { margin: 0; background-color: #020205; overflow: hidden; font-family: 'Segoe UI', sans-serif; color: white; }
+        body { margin: 0; background-color: #020205; overflow: hidden; font-family: 'Segoe UI', sans-serif; color: #00ffff; }
         canvas { display: block; }
         
         #ui {
@@ -15,29 +15,30 @@
             width: 95%; 
         }
         h1 { 
-            font-size: clamp(1.2rem, 4vw, 2.8rem); 
-            margin: 0; letter-spacing: 6px; font-weight: 900; color: #ffffff; 
-            text-shadow: 0 0 15px rgba(255,255,255,0.7);
+            font-size: clamp(1.2rem, 4.2vw, 3rem); 
+            margin: 0; letter-spacing: 6px; font-weight: 900; 
+            color: #00ffff; /* Titles are now Cyan to match theme */
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
             text-transform: uppercase; white-space: nowrap; 
         }
-        h2 { font-size: clamp(0.8rem, 2vw, 1.4rem); margin: 10px 0 5px 0; letter-spacing: 3px; font-weight: 400; opacity: 0.9; }
-        h3 { font-size: clamp(0.5rem, 1.2vw, 0.8rem); margin: 0; letter-spacing: 2px; font-weight: 300; opacity: 0.5; text-transform: uppercase; }
+        h2 { font-size: clamp(0.8rem, 2.2vw, 1.5rem); margin: 12px 0 5px 0; letter-spacing: 4px; font-weight: 400; color: #ff00ff; }
+        h3 { font-size: clamp(0.6rem, 1.4vw, 0.9rem); margin: 0; letter-spacing: 3px; font-weight: 300; opacity: 0.7; color: #00ffff; text-transform: uppercase; }
 
         #controls-ui {
             position: absolute; bottom: 20px; left: 20px;
             display: flex; gap: 15px; align-items: center;
-            background: rgba(0,0,0,0.8); padding: 10px 15px; border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+            background: rgba(0,0,0,0.85); padding: 12px 18px; border-radius: 10px;
+            border: 1px solid #ff00ff; backdrop-filter: blur(15px);
             z-index: 20;
         }
-        .key-group { display: grid; grid-template-columns: repeat(3, 24px); gap: 3px; }
-        .key { width: 24px; height: 24px; border: 1px solid #444; border-radius: 3px; 
-               display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #666; }
-        .key.active { background: #00ffff; color: #000; border-color: #00ffff; box-shadow: 0 0 8px #00ffff; }
+        .key-group { display: grid; grid-template-columns: repeat(3, 24px); gap: 4px; }
+        .key { width: 24px; height: 24px; border: 1px solid #00ffff; border-radius: 4px; 
+               display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #00ffff; }
+        .key.active { background: #ff00ff; color: #000; border-color: #ff00ff; box-shadow: 0 0 12px #ff00ff; }
         
-        #mode-info { border-left: 1px solid rgba(255,255,255,0.1); padding-left: 15px; min-width: 130px; }
-        #mode-display { font-size: 0.75rem; color: #00ffff; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; }
-        #sub-mode { font-size: 0.55rem; color: #666; text-transform: uppercase; }
+        #mode-info { border-left: 1px solid #ff00ff; padding-left: 15px; min-width: 140px; }
+        #mode-display { font-size: 0.8rem; color: #ff00ff; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
+        #sub-mode { font-size: 0.6rem; color: #00ffff; text-transform: uppercase; opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -66,27 +67,29 @@
         import * as THREE from 'https://esm.sh/three@0.160.0';
         import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-        const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x020205, 0.18); 
+        // --- COLORS ---
+        const CYAN = 0x00ffff;
+        const MAGENTA = 0xff00ff;
+        const HIGHLIGHT = 0xffff00; 
+        const BG = 0x020205;
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(BG, 0.2); 
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 400);
         const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(1); 
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const light = new THREE.PointLight(0xffffff, 80);
+        // Ambient light is now Cyan, Point light is Magenta - Zero White light
+        scene.add(new THREE.AmbientLight(CYAN, 0.5));
+        const light = new THREE.PointLight(MAGENTA, 100);
         light.position.set(2, 2, 2);
         scene.add(light);
 
-        // --- EXPLICIT COLOR CONSTANTS ---
-        const CYAN = 0x00ffff;
-        const MAGENTA = 0xff00ff;
-        const YELLOW = 0xffff00;
-
         const grid = 14; 
-        const atomGeom = new THREE.SphereGeometry(0.12, 8, 8); 
+        const atomGeom = new THREE.SphereGeometry(0.12, 12, 12); // Compromise 12 segments
         const cyanMat = new THREE.MeshLambertMaterial({ color: CYAN });
         const magentaMat = new THREE.MeshLambertMaterial({ color: MAGENTA });
 
@@ -130,11 +133,11 @@
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        // ULTRA ZOOM: Camera is now extremely close to the center
-        camera.position.set(0, 0, grid * 0.45); 
+        // SUPER ZOOM: Observer is practically touching the center atoms
+        camera.position.set(0, 0, grid * 0.35); 
 
         function updatePlanes(h, k, l) {
-            const hColor = new THREE.Color(YELLOW);
+            const hColor = new THREE.Color(HIGHLIGHT);
             atomData.forEach(a => {
                 const val = (a.x * h) + (a.y * k) + (a.z * l);
                 const on = Math.abs(val % 1) < 0.03 || Math.abs(val % 1) > 0.97;
@@ -147,8 +150,7 @@
 
         function snap(h, k, l) {
             updatePlanes(h, k, l);
-            // Lock snap distance to the new 2x zoom level
-            const target = new THREE.Vector3(h, k, l).normalize().multiplyScalar(grid * 0.45);
+            const target = new THREE.Vector3(h, k, l).normalize().multiplyScalar(grid * 0.35);
             const start = camera.position.clone();
             let p = 0;
             const step = () => {
@@ -184,7 +186,7 @@
             if (keys['KeyA']) camera.position.addScaledVector(s, 0.1);
             if (keys['KeyD']) camera.position.addScaledVector(s, -0.1);
             
-            latticeGroup.rotation.y += 0.0006; 
+            latticeGroup.rotation.y += 0.0005; 
             controls.update();
             renderer.render(scene, camera);
         }
