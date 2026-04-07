@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIE 201 - Materials Hero Final</title>
+    <title>MIE 201 - Materials Hero</title>
     <style>
         body { margin: 0; background-color: #020205; overflow: hidden; font-family: 'Segoe UI', sans-serif; color: white; }
         canvas { display: block; }
@@ -17,7 +17,7 @@
         h1 { 
             font-size: clamp(1.2rem, 4vw, 2.8rem); 
             margin: 0; letter-spacing: 6px; font-weight: 900; color: #ffffff; 
-            text-shadow: 0 0 15px rgba(255,255,255,0.7);
+            text-shadow: 0 0 15px rgba(255,255,255,0.8);
             text-transform: uppercase; white-space: nowrap; 
         }
         h2 { font-size: clamp(0.8rem, 2vw, 1.4rem); margin: 10px 0 5px 0; letter-spacing: 3px; font-weight: 400; opacity: 0.9; }
@@ -26,7 +26,7 @@
         #controls-ui {
             position: absolute; bottom: 20px; left: 20px;
             display: flex; gap: 15px; align-items: center;
-            background: rgba(0,0,0,0.7); padding: 10px 15px; border-radius: 10px;
+            background: rgba(0,0,0,0.8); padding: 10px 15px; border-radius: 10px;
             border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px);
             z-index: 20;
         }
@@ -67,7 +67,8 @@
         import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x020205, 0.18); 
+        // Fog still active for depth, but using MeshBasicMaterial prevents color shifting
+        scene.fog = new THREE.FogExp2(0x020205, 0.2); 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
         const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" });
@@ -75,20 +76,17 @@
         renderer.setPixelRatio(1); 
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const light = new THREE.PointLight(0xffffff, 80);
-        light.position.set(2, 2, 2);
-        scene.add(light);
-
-        // --- HARD-CODED COLORS ---
-        const CYAN_HEX = 0x00ffff;
-        const MAGENTA_HEX = 0xff00ff;
-        const YELLOW_HEX = 0xffff00;
+        // HEX CONSTANTS
+        const CYAN = 0x00ffff;
+        const MAGENTA = 0xff00ff;
+        const YELLOW = 0xffff00;
 
         const grid = 14; 
-        const atomGeom = new THREE.SphereGeometry(0.12, 12, 12); // Compromise 12 segments
-        const cyanMat = new THREE.MeshLambertMaterial({ color: CYAN_HEX });
-        const magentaMat = new THREE.MeshLambertMaterial({ color: MAGENTA_HEX });
+        const atomGeom = new THREE.SphereGeometry(0.12, 12, 12); 
+        
+        // MeshBasicMaterial is immune to lighting - Guaranteed Cyan/Magenta
+        const cyanMat = new THREE.MeshBasicMaterial({ color: CYAN });
+        const magentaMat = new THREE.MeshBasicMaterial({ color: MAGENTA });
 
         const corners = new THREE.InstancedMesh(atomGeom, cyanMat, (grid+1)**3); 
         const faces = new THREE.InstancedMesh(atomGeom, magentaMat, grid**3 * 6); 
@@ -106,42 +104,48 @@
                 for (let z = 0; z <= grid; z++) {
                     const px = x-offset; const py = y-offset; const pz = z-offset;
                     dummy.position.set(px, py, pz); dummy.updateMatrix();
+                    
+                    // CORNER ATOMS: CYAN
                     corners.setMatrixAt(cIdx++, dummy.matrix);
-                    // Force the base color to be Cyan in the data array
-                    atomData.push({ mesh: corners, id: cIdx-1, x, y, z, base: CYAN_HEX });
+                    corners.setColorAt(cIdx - 1, new THREE.Color(CYAN));
+                    atomData.push({ m: corners, id: cIdx-1, x, y, z, base: CYAN });
 
-                    // Face-centered atoms - Force base color to Magenta
+                    // FACE ATOMS: MAGENTA
                     if (x < grid && y < grid) {
                         dummy.position.set(px+0.5, py+0.5, pz); dummy.updateMatrix();
                         faces.setMatrixAt(fIdx++, dummy.matrix);
-                        atomData.push({ mesh: faces, id: fIdx-1, x:x+0.5, y:y+0.5, z, base: MAGENTA_HEX });
+                        faces.setColorAt(fIdx - 1, new THREE.Color(MAGENTA));
+                        atomData.push({ m: faces, id: fIdx-1, x:x+0.5, y:y+0.5, z, base: MAGENTA });
                     }
                     if (y < grid && z < grid) {
                         dummy.position.set(px, py+0.5, pz+0.5); dummy.updateMatrix();
                         faces.setMatrixAt(fIdx++, dummy.matrix);
-                        atomData.push({ mesh: faces, id: fIdx-1, x, y:y+0.5, z:z+0.5, base: MAGENTA_HEX });
+                        faces.setColorAt(fIdx - 1, new THREE.Color(MAGENTA));
+                        atomData.push({ m: faces, id: fIdx-1, x, y:y+0.5, z:z+0.5, base: MAGENTA });
                     }
                     if (x < grid && z < grid) {
                         dummy.position.set(px+0.5, py, pz+0.5); dummy.updateMatrix();
                         faces.setMatrixAt(fIdx++, dummy.matrix);
-                        atomData.push({ mesh: faces, id: fIdx-1, x:x+0.5, y, z:z+0.5, base: MAGENTA_HEX });
+                        faces.setColorAt(fIdx - 1, new THREE.Color(MAGENTA));
+                        atomData.push({ m: faces, id: fIdx-1, x:x+0.5, y, z:z+0.5, base: MAGENTA });
                     }
                 }
             }
         }
+        corners.instanceColor.needsUpdate = true;
+        faces.instanceColor.needsUpdate = true;
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        // ULTRA ZOOM: Deep inside the lattice
+        // Deep Zoom
         camera.position.set(0, 0, grid * 0.35); 
 
         function updatePlanes(h, k, l) {
-            const hColor = new THREE.Color(YELLOW_HEX);
+            const hColor = new THREE.Color(YELLOW);
             atomData.forEach(a => {
                 const val = (a.x * h) + (a.y * k) + (a.z * l);
                 const on = Math.abs(val % 1) < 0.03 || Math.abs(val % 1) > 0.97;
-                // If not on the plane, we force it back to its specific HEX base
-                a.mesh.setColorAt(a.id, on ? hColor : new THREE.Color(a.base));
+                a.m.setColorAt(a.id, on ? hColor : new THREE.Color(a.base));
             });
             corners.instanceColor.needsUpdate = true;
             faces.instanceColor.needsUpdate = true;
