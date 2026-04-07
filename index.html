@@ -1,83 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FCC Unit Cell</title>
     <style>
-        body { margin: 0; background-color: #000; overflow: hidden; }
-        canvas { display: block; width: 100vw; height: 100vh; }
+        body { margin: 0; background-color: #000; overflow: hidden; width: 100vw; height: 100vh; }
+        canvas { display: block; }
     </style>
-    
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
 </head>
 <body>
     <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        // This pulls Three.js and OrbitControls directly without needing a separate map
+        import * as THREE from 'https://esm.sh/three@0.160.0';
+        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
+        // --- Scene Setup ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
-        const light = new THREE.PointLight(0xffffff, 1.5, 100);
+        // --- Lighting ---
+        const light = new THREE.PointLight(0xffffff, 2, 100);
         light.position.set(5, 5, 5);
         scene.add(light);
-        scene.add(new THREE.AmbientLight(0x404040, 2));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-        // Atom Setup
-        const atomGeom = new THREE.SphereGeometry(0.15, 32, 32);
+        // --- Atoms (FCC) ---
+        const atomGeom = new THREE.SphereGeometry(0.18, 32, 32);
         const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 100 });
         const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 100 });
 
         const corners = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1]];
         const faces = [[0.5,0.5,0],[0.5,0.5,1],[0.5,0,0.5],[0.5,1,0.5],[0,0.5,0.5],[1,0.5,0.5]];
 
-        function createAtoms(list, mat) {
+        const atomGroup = new THREE.Group();
+        
+        const createAtoms = (list, mat) => {
             list.forEach(p => {
                 const mesh = new THREE.Mesh(atomGeom, mat);
                 mesh.position.set(p[0]-0.5, p[1]-0.5, p[2]-0.5);
-                scene.add(mesh);
+                atomGroup.add(mesh);
             });
-        }
+        };
 
         createAtoms(corners, blueMat);
         createAtoms(faces, redMat);
+        scene.add(atomGroup);
 
-        // Unit Cell Wireframe
+        // --- Unit Cell Box ---
         const box = new THREE.Mesh(
             new THREE.BoxGeometry(1,1,1), 
-            new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true, transparent: true, opacity: 0.2})
+            new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true, transparent: true, opacity: 0.3})
         );
         scene.add(box);
 
         camera.position.set(1.5, 1.5, 2);
-        
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; // Makes rotation feel "heavy" and smooth
+        controls.enableDamping = true;
 
+        // --- Animation Loop ---
         function animate() {
             requestAnimationFrame(animate);
-            scene.rotation.y += 0.003; // Gentle auto-rotation
+            atomGroup.rotation.y += 0.005;
+            box.rotation.y += 0.005;
             controls.update();
             renderer.render(scene, camera);
         }
-        animate();
-
+        
+        // --- Responsiveness ---
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        animate();
+        console.log("Three.js Scene Initialized Successfully");
     </script>
 </body>
 </html>
