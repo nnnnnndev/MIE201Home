@@ -3,25 +3,20 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIE 201 Hero</title>
+    <title>MIE 201 Horizon</title>
     <style>
-        body { margin: 0; background-color: #050505; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; background-color: #020205; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
         
         #ui {
-            position: absolute; top: 50%; left: 50%;
+            position: absolute; top: 40%; left: 50%;
             transform: translate(-50%, -50%);
             text-align: center; color: white;
             pointer-events: none; z-index: 10;
         }
-        h1 { font-size: clamp(3rem, 10vw, 7rem); margin: 0; letter-spacing: 15px; font-weight: 900; color: #fff; text-shadow: 0 0 30px rgba(0,0,0,0.9); }
-        p { font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; opacity: 0.8; }
-        
-        #controls-hint {
-            position: absolute; bottom: 20px; width: 100%;
-            text-align: center; color: rgba(255,255,255,0.4);
-            font-size: 0.7rem; letter-spacing: 2px;
-        }
+        h1 { font-size: clamp(4rem, 12vw, 8rem); margin: 0; letter-spacing: 20px; font-weight: 900; 
+             background: linear-gradient(to bottom, #fff, #666); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        p { font-size: 1.1rem; letter-spacing: 8px; text-transform: uppercase; opacity: 0.5; margin-top: -10px; }
     </style>
 </head>
 <body>
@@ -31,103 +26,91 @@
         <p>Mechanical & Industrial Engineering</p>
     </div>
 
-    <div id="controls-hint">WASD / ARROWS TO PAN • MOUSE TO ROTATE • SCROLL TO ZOOM</div>
-
     <script type="module">
         import * as THREE from 'https://esm.sh/three@0.160.0';
-        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
         const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020205, 0.15); // Adds the "Infinite" fading effect
+
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
-        const light1 = new THREE.DirectionalLight(0xffffff, 3);
-        light1.position.set(10, 20, 10);
-        scene.add(light1);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        // Lighting - High contrast "Lab" style
+        const pLight = new THREE.PointLight(0xffffff, 50, 100);
+        pLight.position.set(0, 10, 0);
+        scene.add(pLight);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
-        // Lattice Config
-        const nx = 5, ny = 5, nz = 4; // 5x5x4 = 100 Unit Cells
-        const cellSize = 1.0; 
-        const cellGap = 0.5; // INCREASE THIS to see the cells more clearly
-        const stride = cellSize + cellGap;
+        // Lattice Settings: 30x30 = 900 Unit Cells
+        const grid = 30; 
+        const atomGeom = new THREE.SphereGeometry(0.1, 12, 12);
+        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 50 });
+        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 50 });
 
-        const atomGeom = new THREE.SphereGeometry(0.12, 16, 16);
-        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db });
-        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c });
+        // Instancing for performance (approx 12,000 atoms)
+        const corners = new THREE.InstancedMesh(atomGeom, blueMat, (grid+1)**2 * 2);
+        const faces = new THREE.InstancedMesh(atomGeom, redMat, grid**2 * 3);
+        
+        let cIdx = 0, fIdx = 0;
+        const dummy = new THREE.Object3D();
 
-        const mainGroup = new THREE.Group();
+        for (let x = 0; x <= grid; x++) {
+            for (let z = 0; z <= grid; z++) {
+                // Ground layer + One layer up
+                for (let y = 0; y <= 1; y++) {
+                    dummy.position.set(x, y, z);
+                    dummy.updateMatrix();
+                    corners.setMatrixAt(cIdx++, dummy.matrix);
 
-        // FCC coordinates for ONE unit cell
-        const corners = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1]];
-        const faces = [[0.5,0.5,0],[0.5,0.5,1],[0.5,0,0.5],[0.5,1,0.5],[0,0.5,0.5],[1,0.5,0.5]];
-
-        // Generate 100 Unit Cells
-        for (let x = 0; x < nx; x++) {
-            for (let y = 0; y < ny; y++) {
-                for (let z = 0; z < nz; z++) {
-                    const ucGroup = new THREE.Group();
-                    
-                    // Position this specific UC in the grid
-                    ucGroup.position.set(x * stride, y * stride, z * stride);
-
-                    // Add corners
-                    corners.forEach(p => {
-                        const m = new THREE.Mesh(atomGeom, blueMat);
-                        m.position.set(p[0], p[1], p[2]);
-                        ucGroup.add(m);
-                    });
-
-                    // Add faces
-                    faces.forEach(p => {
-                        const m = new THREE.Mesh(atomGeom, redMat);
-                        m.position.set(p[0], p[1], p[2]);
-                        ucGroup.add(m);
-                    });
-
-                    // Add a faint wireframe for each cell
-                    const box = new THREE.Mesh(
-                        new THREE.BoxGeometry(1, 1, 1),
-                        new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.1 })
-                    );
-                    box.position.set(0.5, 0.5, 0.5);
-                    ucGroup.add(box);
-
-                    mainGroup.add(ucGroup);
+                    if (x < grid && y < 1) {
+                        dummy.position.set(x + 0.5, y + 0.5, z);
+                        dummy.updateMatrix();
+                        faces.setMatrixAt(fIdx++, dummy.matrix);
+                    }
+                    if (z < grid && y < 1) {
+                        dummy.position.set(x, y + 0.5, z + 0.5);
+                        dummy.updateMatrix();
+                        faces.setMatrixAt(fIdx++, dummy.matrix);
+                    }
+                    if (x < grid && z < grid) {
+                        dummy.position.set(x + 0.5, y, z + 0.5);
+                        dummy.updateMatrix();
+                        faces.setMatrixAt(fIdx++, dummy.matrix);
+                    }
                 }
             }
         }
+        scene.add(corners, faces);
 
-        // Center the whole array
-        mainGroup.position.set(-(nx * stride)/2, -(ny * stride)/2, -(nz * stride)/2);
-        scene.add(mainGroup);
+        // Camera Setup (Low Horizon)
+        camera.position.set(grid/2, 1.5, grid/2 + 5);
+        camera.lookAt(grid/2, 0.5, grid/2 - 10);
 
-        camera.position.set(10, 10, 15);
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-
-        // WASD / Arrow Keys
+        // Smooth "Drone" Controls
         const keys = {};
+        const velocity = new THREE.Vector3();
         window.addEventListener('keydown', (e) => keys[e.code] = true);
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        function handleInput() {
-            const s = 0.2;
-            if (keys['KeyW'] || keys['ArrowUp']) camera.position.y += s;
-            if (keys['KeyS'] || keys['ArrowDown']) camera.position.y -= s;
-            if (keys['KeyA'] || keys['ArrowLeft']) camera.position.x -= s;
-            if (keys['KeyD'] || keys['ArrowRight']) camera.position.x += s;
-        }
-
         function animate() {
             requestAnimationFrame(animate);
-            handleInput();
-            mainGroup.rotation.y += 0.001;
-            controls.update();
+
+            // Flyover Movement Logic
+            if (keys['KeyW'] || keys['ArrowUp']) velocity.z -= 0.005;
+            if (keys['KeyS'] || keys['ArrowDown']) velocity.z += 0.005;
+            if (keys['KeyA'] || keys['ArrowLeft']) velocity.x -= 0.005;
+            if (keys['KeyD'] || keys['ArrowRight']) velocity.x += 0.005;
+
+            // Apply friction/damping
+            velocity.multiplyScalar(0.95);
+            camera.position.add(velocity);
+
+            // Subtle "Breathing" camera movement
+            camera.position.y = 1.5 + Math.sin(Date.now() * 0.001) * 0.1;
+
             renderer.render(scene, camera);
         }
 
