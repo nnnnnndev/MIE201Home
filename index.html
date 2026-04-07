@@ -3,125 +3,131 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIE 201 - Materials Science</title>
+    <title>MIE 201 Hero</title>
     <style>
-        body { margin: 0; background-color: #050505; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; background-color: #050505; overflow: hidden; font-family: sans-serif; }
         canvas { display: block; }
         
-        /* The Overlay Text */
-        #hero-ui {
+        /* Text Overlay */
+        #ui {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
             color: white;
-            pointer-events: none; /* Allows mouse to click "through" text to the 3D model */
-            text-shadow: 0 0 20px rgba(0,0,0,0.8);
+            pointer-events: none; /* Mouse clicks pass through to the 3D scene */
+            z-index: 10;
         }
-        h1 { font-size: 5rem; margin: 0; letter-spacing: 10px; opacity: 0.9; }
-        p { font-size: 1.2rem; text-transform: uppercase; letter-spacing: 4px; opacity: 0.7; }
+        h1 { font-size: 6rem; margin: 0; letter-spacing: 15px; font-weight: 900; opacity: 0.8; }
+        p { font-size: 1.2rem; letter-spacing: 5px; text-transform: uppercase; opacity: 0.6; }
         
-        /* Small Instructions */
-        #nav-hint {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            color: rgba(255,255,255,0.4);
-            font-size: 0.8rem;
+        #controls-hint {
+            position: absolute; bottom: 20px; width: 100%;
+            text-align: center; color: rgba(255,255,255,0.3);
+            font-size: 0.7rem; letter-spacing: 2px;
         }
     </style>
 </head>
 <body>
 
-    <div id="hero-ui">
+    <div id="ui">
         <h1>MIE 201</h1>
-        <p>Introduction to Materials Science</p>
+        <p>Mechanical & Industrial Engineering</p>
     </div>
 
-    <div id="nav-hint">WASD / Arrows to Move • Mouse to Rotate • Scroll to Zoom</div>
+    <div id="controls-hint">WASD / ARROWS TO PAN • MOUSE TO ROTATE • SCROLL TO ZOOM</div>
 
     <script type="module">
         import * as THREE from 'https://esm.sh/three@0.160.0';
         import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
         // Lighting
-        const mainLight = new THREE.DirectionalLight(0xffffff, 3);
-        mainLight.position.set(10, 10, 10);
-        scene.add(mainLight);
+        const sun = new THREE.DirectionalLight(0xffffff, 3);
+        sun.position.set(10, 20, 10);
+        scene.add(sun);
         scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-        // Materials & Geometry
+        // Lattice Configuration: 5x5x4 = 100 Unit Cells
+        const nx = 5, ny = 5, nz = 4;
         const atomGeom = new THREE.SphereGeometry(0.12, 16, 16);
-        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 80 });
-        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 80 });
+        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 100 });
+        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 100 });
 
-        const latticeGroup = new THREE.Group();
+        // Optimized Rendering (InstancedMesh)
+        // Corner atoms (Blue) + Face atoms (Red)
+        const cornerCount = (nx + 1) * (ny + 1) * (nz + 1);
+        const faceCount = (nx * ny * (nz + 1)) + (nx * (ny + 1) * nz) + ((nx + 1) * ny * nz);
+        
+        const blueInstances = new THREE.InstancedMesh(atomGeom, blueMat, cornerCount);
+        const redInstances = new THREE.InstancedMesh(atomGeom, redMat, faceCount);
+        
+        let bIdx = 0, rIdx = 0;
+        const dummy = new THREE.Object3D();
 
-        // Create a 3x3x3 FCC Lattice
-        const gridSize = 3; 
-        for (let x = 0; x <= gridSize; x++) {
-            for (let y = 0; y <= gridSize; y++) {
-                for (let z = 0; z <= gridSize; z++) {
-                    
-                    // 1. Corner Atoms (Blue)
-                    const corner = new THREE.Mesh(atomGeom, blueMat);
-                    corner.position.set(x, y, z);
-                    latticeGroup.add(corner);
+        for (let x = 0; x <= nx; x++) {
+            for (let y = 0; y <= ny; y++) {
+                for (let z = 0; z <= nz; z++) {
+                    // Corners
+                    dummy.position.set(x, y, z);
+                    dummy.updateMatrix();
+                    blueInstances.setMatrixAt(bIdx++, dummy.matrix);
 
-                    // 2. Face Center Atoms (Red) - Only add if within bounds
-                    if (x < gridSize && y < gridSize) {
-                        const f1 = new THREE.Mesh(atomGeom, redMat);
-                        f1.position.set(x + 0.5, y + 0.5, z);
-                        latticeGroup.add(f1);
+                    // Faces (Only add if within cell bounds)
+                    if (x < nx && y < ny) {
+                        dummy.position.set(x + 0.5, y + 0.5, z);
+                        dummy.updateMatrix();
+                        redInstances.setMatrixAt(rIdx++, dummy.matrix);
                     }
-                    if (y < gridSize && z < gridSize) {
-                        const f2 = new THREE.Mesh(atomGeom, redMat);
-                        f2.position.set(x, y + 0.5, z + 0.5);
-                        latticeGroup.add(f2);
+                    if (y < ny && z < nz) {
+                        dummy.position.set(x, y + 0.5, z + 0.5);
+                        dummy.updateMatrix();
+                        redInstances.setMatrixAt(rIdx++, dummy.matrix);
                     }
-                    if (x < gridSize && z < gridSize) {
-                        const f3 = new THREE.Mesh(atomGeom, redMat);
-                        f3.position.set(x + 0.5, y, z + 0.5);
-                        latticeGroup.add(f3);
+                    if (x < nx && z < nz) {
+                        dummy.position.set(x + 0.5, y, z + 0.5);
+                        dummy.updateMatrix();
+                        redInstances.setMatrixAt(rIdx++, dummy.matrix);
                     }
                 }
             }
         }
 
-        // Center the whole group
-        const offset = gridSize / 2;
-        latticeGroup.position.set(-offset, -offset, -offset);
-        scene.add(latticeGroup);
+        const lattice = new THREE.Group();
+        lattice.add(blueInstances, redInstances);
+        lattice.position.set(-nx/2, -ny/2, -nz/2); // Center the block
+        scene.add(lattice);
 
-        camera.position.set(4, 4, 6);
-
+        // Camera & Controls
+        camera.position.set(8, 6, 10);
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
 
-        // WASD / Arrow Movement Logic
-        const moveSpeed = 0.1;
+        // WASD / Arrow Keys for Panning
         const keys = {};
+        const moveSpeed = 0.15;
         window.addEventListener('keydown', (e) => keys[e.code] = true);
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        function handleMovement() {
-            if (keys['KeyW'] || keys['ArrowUp']) camera.position.y += moveSpeed;
-            if (keys['KeyS'] || keys['ArrowDown']) camera.position.y -= moveSpeed;
-            if (keys['KeyA'] || keys['ArrowLeft']) camera.position.x -= moveSpeed;
-            if (keys['KeyD'] || keys['ArrowRight']) camera.position.x += moveSpeed;
+        function handleInput() {
+            // "Pan" the camera based on view direction
+            if (keys['KeyW'] || keys['ArrowUp']) controls.target.y += moveSpeed;
+            if (keys['KeyS'] || keys['ArrowDown']) controls.target.y -= moveSpeed;
+            if (keys['KeyA'] || keys['ArrowLeft']) controls.target.x -= moveSpeed;
+            if (keys['KeyD'] || keys['ArrowRight']) controls.target.x += moveSpeed;
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            handleMovement();
-            latticeGroup.rotation.y += 0.001; // Very slow cinematic spin
+            handleInput();
+            lattice.rotation.y += 0.001; // Slow rotation
             controls.update();
             renderer.render(scene, camera);
         }
