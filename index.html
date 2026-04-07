@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style> body { margin: 0; overflow: hidden; background: #111; } canvas { width: 100vw; height: 100vh; } </style>
+</head>
+<body>
+    <script src="https://cloudflare.com"></script>
+    <script src="https://jsdelivr.net"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Add Light
+        const light = new THREE.PointLight(0xffffff, 1, 100);
+        light.position.set(10, 10, 10);
+        scene.add(light, new THREE.AmbientLight(0x404040));
+
+        // Create Atom Material & Geometry
+        const atomGeom = new THREE.SphereGeometry(0.15, 32, 32);
+        const cornerMat = new THREE.MeshPhongMaterial({ color: 0x3498db }); // Blue
+        const faceMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c });   // Red
+
+        // FCC Coordinates
+        const corners = [[0,0,0], [0,0,1], [0,1,0], [0,1,1], [1,0,0], [1,0,1], [1,1,0], [1,1,1]];
+        const faces = [[0.5,0.5,0], [0.5,0.5,1], [0.5,0,0.5], [0.5,1,0.5], [0,0.5,0.5], [1,0.5,0.5]];
+
+        function addAtoms(coords, material) {
+            coords.forEach(pos => {
+                const atom = new THREE.Mesh(atomGeom, material);
+                atom.position.set(pos[0]-0.5, pos[1]-0.5, pos[2]-0.5);
+                scene.add(atom);
+            });
+        }
+
+        addAtoms(corners, cornerMat);
+        addAtoms(faces, faceMat);
+
+        // Add a wireframe cube for reference
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ wireframe: true, color: 0x555555 }));
+        scene.add(cube);
+
+        camera.position.z = 2;
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            scene.rotation.y += 0.005; // Automatic slow pan
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
