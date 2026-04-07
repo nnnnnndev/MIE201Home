@@ -1,30 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
+    <title>FCC Unit Cell</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; }
-        canvas { display: block; }
+        canvas { display: block; width: 100vw; height: 100vh; }
     </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 </head>
 <body>
-    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-    <script>
-        // All Three.js functions now start with THREE. because of the global script above
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        const light = new THREE.PointLight(0xffffff, 1, 100);
+        // Lighting
+        const light = new THREE.PointLight(0xffffff, 1.5, 100);
         light.position.set(5, 5, 5);
-        scene.add(light, new THREE.AmbientLight(0x404040));
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x404040, 2));
 
+        // Atom Setup
         const atomGeom = new THREE.SphereGeometry(0.15, 32, 32);
-        const blue = new THREE.MeshPhongMaterial({ color: 0x3498db });
-        const red = new THREE.MeshPhongMaterial({ color: 0xe74c3c });
+        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 100 });
+        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 100 });
 
         const corners = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1]];
         const faces = [[0.5,0.5,0],[0.5,0.5,1],[0.5,0,0.5],[0.5,1,0.5],[0,0.5,0.5],[1,0.5,0.5]];
@@ -37,25 +50,29 @@
             });
         }
 
-        createAtoms(corners, blue);
-        createAtoms(faces, red);
+        createAtoms(corners, blueMat);
+        createAtoms(faces, redMat);
 
-        const box = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial({color:0x444444, wireframe:true}));
+        // Unit Cell Wireframe
+        const box = new THREE.Mesh(
+            new THREE.BoxGeometry(1,1,1), 
+            new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true, transparent: true, opacity: 0.2})
+        );
         scene.add(box);
 
-        camera.position.z = 2.5;
-
-        // Use the global THREE.OrbitControls
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        camera.position.set(1.5, 1.5, 2);
+        
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // Makes rotation feel "heavy" and smooth
 
         function animate() {
             requestAnimationFrame(animate);
-            scene.rotation.y += 0.005;
+            scene.rotation.y += 0.003; // Gentle auto-rotation
+            controls.update();
             renderer.render(scene, camera);
         }
         animate();
 
-        // Fix for window resizing
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
