@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIE 201 - Materials Hero</title>
+    <title>MIE 201 - Materials Hero Final</title>
     <style>
         body { margin: 0; background-color: #020205; overflow: hidden; font-family: 'Segoe UI', sans-serif; color: white; }
         canvas { display: block; }
@@ -32,7 +32,7 @@
         }
         .key-group { display: grid; grid-template-columns: repeat(3, 24px); gap: 3px; }
         .key { width: 24px; height: 24px; border: 1px solid #444; border-radius: 3px; 
-               display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #666; }
+               display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #666; transition: all 0.1s; }
         .key.active { background: #00ffff; color: #000; border-color: #00ffff; box-shadow: 0 0 8px #00ffff; }
         
         #mode-info { border-left: 1px solid rgba(255,255,255,0.1); padding-left: 15px; min-width: 130px; }
@@ -57,39 +57,48 @@
             <div id="key-1" class="key">1</div><div id="key-2" class="key">2</div><div id="key-3" class="key">3</div>
         </div>
         <div id="mode-info">
-            <div id="mode-display">---</div>
+            <div id="mode-display">Initializing</div>
             <div id="sub-mode">Interactive Lattice</div>
         </div>
     </div>
 
     <script type="module">
-        import * as THREE from 'https://esm.sh/three@0.160.0';
-        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
+        // --- Core Scene Setup ---
         const scene = new THREE.Scene();
-        // Fog still active for depth, but using MeshBasicMaterial prevents color shifting
-        scene.fog = new THREE.FogExp2(0x020205, 0.2); 
+        scene.fog = new THREE.FogExp2(0x020205, 0.18); 
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
-        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" });
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "low-power" });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(1); 
+        // Performance Fix: Cap pixel ratio to 2 to prevent 4k monitors from melting student GPUs
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
         document.body.appendChild(renderer.domElement);
 
-        // HEX CONSTANTS
-        const CYAN = 0x00ffff;
-        const MAGENTA = 0xff00ff;
-        const YELLOW = 0xffff00;
+        // --- Lighting ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
 
+        // --- Strict Colors ---
+        const CYAN = new THREE.Color(0x00ffff);
+        const MAGENTA = new THREE.Color(0xff00ff);
+        const YELLOW = new THREE.Color(0xffff00);
+
+        // --- Optimized Geometry & Materials ---
         const grid = 14; 
-        const atomGeom = new THREE.SphereGeometry(0.12, 12, 12); 
+        const atomGeom = new THREE.SphereGeometry(0.12, 16, 16); // Restored to 16 segments
         
-        // MeshBasicMaterial is immune to lighting - Guaranteed Cyan/Magenta
-        const cyanMat = new THREE.MeshBasicMaterial({ color: CYAN });
-        const magentaMat = new THREE.MeshBasicMaterial({ color: MAGENTA });
+        // CRITICAL FIX: Base material MUST be white to prevent hex colors from muddying.
+        const baseMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
 
-        const corners = new THREE.InstancedMesh(atomGeom, cyanMat, (grid+1)**3); 
-        const faces = new THREE.InstancedMesh(atomGeom, magentaMat, grid**3 * 6); 
+        const corners = new THREE.InstancedMesh(atomGeom, baseMaterial, (grid+1)**3); 
+        const faces = new THREE.InstancedMesh(atomGeom, baseMaterial, grid**3 * 6); 
+        
         const latticeGroup = new THREE.Group();
         latticeGroup.add(corners, faces);
         scene.add(latticeGroup);
@@ -99,53 +108,63 @@
         const dummy = new THREE.Object3D();
         const offset = grid / 2;
 
+        // --- Lattice Construction ---
         for (let x = 0; x <= grid; x++) {
             for (let y = 0; y <= grid; y++) {
                 for (let z = 0; z <= grid; z++) {
-                    const px = x-offset; const py = y-offset; const pz = z-offset;
-                    dummy.position.set(px, py, pz); dummy.updateMatrix();
+                    const px = x - offset; const py = y - offset; const pz = z - offset;
                     
-                    // CORNER ATOMS: CYAN
-                    corners.setMatrixAt(cIdx++, dummy.matrix);
-                    corners.setColorAt(cIdx - 1, new THREE.Color(CYAN));
-                    atomData.push({ m: corners, id: cIdx-1, x, y, z, base: CYAN });
+                    // Corner Atoms -> CYAN
+                    dummy.position.set(px, py, pz); 
+                    dummy.updateMatrix();
+                    corners.setMatrixAt(cIdx, dummy.matrix);
+                    corners.setColorAt(cIdx, CYAN);
+                    atomData.push({ mesh: corners, id: cIdx, x, y, z, baseColor: CYAN });
+                    cIdx++;
 
-                    // FACE ATOMS: MAGENTA
+                    // Face-Centered Atoms -> MAGENTA
                     if (x < grid && y < grid) {
                         dummy.position.set(px+0.5, py+0.5, pz); dummy.updateMatrix();
-                        faces.setMatrixAt(fIdx++, dummy.matrix);
-                        faces.setColorAt(fIdx - 1, new THREE.Color(MAGENTA));
-                        atomData.push({ m: faces, id: fIdx-1, x:x+0.5, y:y+0.5, z, base: MAGENTA });
+                        faces.setMatrixAt(fIdx, dummy.matrix);
+                        faces.setColorAt(fIdx, MAGENTA);
+                        atomData.push({ mesh: faces, id: fIdx, x:x+0.5, y:y+0.5, z, baseColor: MAGENTA });
+                        fIdx++;
                     }
                     if (y < grid && z < grid) {
                         dummy.position.set(px, py+0.5, pz+0.5); dummy.updateMatrix();
-                        faces.setMatrixAt(fIdx++, dummy.matrix);
-                        faces.setColorAt(fIdx - 1, new THREE.Color(MAGENTA));
-                        atomData.push({ m: faces, id: fIdx-1, x, y:y+0.5, z:z+0.5, base: MAGENTA });
+                        faces.setMatrixAt(fIdx, dummy.matrix);
+                        faces.setColorAt(fIdx, MAGENTA);
+                        atomData.push({ mesh: faces, id: fIdx, x, y:y+0.5, z:z+0.5, baseColor: MAGENTA });
+                        fIdx++;
                     }
                     if (x < grid && z < grid) {
                         dummy.position.set(px+0.5, py, pz+0.5); dummy.updateMatrix();
-                        faces.setMatrixAt(fIdx++, dummy.matrix);
-                        faces.setColorAt(fIdx - 1, new THREE.Color(MAGENTA));
-                        atomData.push({ m: faces, id: fIdx-1, x:x+0.5, y, z:z+0.5, base: MAGENTA });
+                        faces.setMatrixAt(fIdx, dummy.matrix);
+                        faces.setColorAt(fIdx, MAGENTA);
+                        atomData.push({ mesh: faces, id: fIdx, x:x+0.5, y, z:z+0.5, baseColor: MAGENTA });
+                        fIdx++;
                     }
                 }
             }
         }
+        
+        // Push initial color data to GPU
         corners.instanceColor.needsUpdate = true;
         faces.instanceColor.needsUpdate = true;
 
+        // --- Controls & Camera Setup ---
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        // Deep Zoom
-        camera.position.set(0, 0, grid * 0.35); 
+        controls.dampingFactor = 0.05;
+        camera.position.set(0, 0, grid * 0.35); // Retained maximum zoom
 
+        // --- Interactivity ---
         function updatePlanes(h, k, l) {
-            const hColor = new THREE.Color(YELLOW);
             atomData.forEach(a => {
                 const val = (a.x * h) + (a.y * k) + (a.z * l);
-                const on = Math.abs(val % 1) < 0.03 || Math.abs(val % 1) > 0.97;
-                a.m.setColorAt(a.id, on ? hColor : new THREE.Color(a.base));
+                // Tolerance for floating point math
+                const onPlane = Math.abs(val % 1) < 0.03 || Math.abs(val % 1) > 0.97;
+                a.mesh.setColorAt(a.id, onPlane ? YELLOW : a.baseColor);
             });
             corners.instanceColor.needsUpdate = true;
             faces.instanceColor.needsUpdate = true;
@@ -158,7 +177,7 @@
             const start = camera.position.clone();
             let p = 0;
             const step = () => {
-                p += 0.05;
+                p += 0.04;
                 camera.position.lerpVectors(start, target, p);
                 camera.lookAt(0,0,0);
                 if (p < 1) requestAnimationFrame(step);
@@ -166,23 +185,29 @@
             step();
         }
 
+        // --- Input Handling ---
         const keys = {};
         window.addEventListener('keydown', (e) => {
             keys[e.code] = true;
             if (['Digit1', 'Numpad1'].includes(e.code)) snap(1, 0, 0);
             if (['Digit2', 'Numpad2'].includes(e.code)) snap(1, 1, 0);
             if (['Digit3', 'Numpad3'].includes(e.code)) snap(1, 1, 1);
+            
             const el = document.getElementById('key-' + e.key.toUpperCase());
             if (el) el.classList.add('active');
         });
+        
         window.addEventListener('keyup', (e) => {
             keys[e.code] = false;
             const el = document.getElementById('key-' + e.key.toUpperCase());
             if (el) el.classList.remove('active');
         });
 
+        // --- Render Loop ---
         function animate() {
             requestAnimationFrame(animate);
+            
+            // WASD Manual Flight
             const f = new THREE.Vector3(); camera.getWorldDirection(f);
             const s = new THREE.Vector3().crossVectors(camera.up, f).normalize();
             if (keys['KeyW']) camera.position.addScaledVector(f, 0.1);
@@ -195,10 +220,13 @@
             renderer.render(scene, camera);
         }
 
+        // Initialize view
         snap(1,1,1);
         animate();
+
+        // Handle browser resize
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
