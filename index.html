@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <style> body { margin: 0; overflow: hidden; background: #111; } canvas { width: 100vw; height: 100vh; } </style>
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
-    <script src="https://cloudflare.com"></script>
-    <script src="https://jsdelivr.net"></script>
+    <!-- Using a reliable UNPKG link for Three.js -->
+    <script src="https://unpkg.com"></script>
+    <script src="https://unpkg.com"></script>
+
     <script>
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -13,41 +18,41 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Add Light
+        // Lights
         const light = new THREE.PointLight(0xffffff, 1, 100);
-        light.position.set(10, 10, 10);
+        light.position.set(5, 5, 5);
         scene.add(light, new THREE.AmbientLight(0x404040));
 
-        // Create Atom Material & Geometry
+        // Atom Setup
         const atomGeom = new THREE.SphereGeometry(0.15, 32, 32);
-        const cornerMat = new THREE.MeshPhongMaterial({ color: 0x3498db }); // Blue
-        const faceMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c });   // Red
+        const blue = new THREE.MeshPhongMaterial({ color: 0x3498db });
+        const red = new THREE.MeshPhongMaterial({ color: 0xe74c3c });
 
-        // FCC Coordinates
-        const corners = [[0,0,0], [0,0,1], [0,1,0], [0,1,1], [1,0,0], [1,0,1], [1,1,0], [1,1,1]];
-        const faces = [[0.5,0.5,0], [0.5,0.5,1], [0.5,0,0.5], [0.5,1,0.5], [0,0.5,0.5], [1,0.5,0.5]];
+        // FCC Coordinates (8 Corners + 6 Faces)
+        const corners = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1]];
+        const faces = [[0.5,0.5,0],[0.5,0.5,1],[0.5,0,0.5],[0.5,1,0.5],[0,0.5,0.5],[1,0.5,0.5]];
 
-        function addAtoms(coords, material) {
-            coords.forEach(pos => {
-                const atom = new THREE.Mesh(atomGeom, material);
-                atom.position.set(pos[0]-0.5, pos[1]-0.5, pos[2]-0.5);
-                scene.add(atom);
+        function createAtoms(list, mat) {
+            list.forEach(p => {
+                const mesh = new THREE.Mesh(atomGeom, mat);
+                mesh.position.set(p[0]-0.5, p[1]-0.5, p[2]-0.5);
+                scene.add(mesh);
             });
         }
 
-        addAtoms(corners, cornerMat);
-        addAtoms(faces, faceMat);
+        createAtoms(corners, blue);
+        createAtoms(faces, red);
 
-        // Add a wireframe cube for reference
-        const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ wireframe: true, color: 0x555555 }));
-        scene.add(cube);
+        // Wireframe box
+        const box = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial({color:0x444444, wireframe:true}));
+        scene.add(box);
 
-        camera.position.z = 2;
+        camera.position.z = 2.5;
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
         function animate() {
             requestAnimationFrame(animate);
-            scene.rotation.y += 0.005; // Automatic slow pan
+            scene.rotation.y += 0.005;
             renderer.render(scene, camera);
         }
         animate();
