@@ -63,8 +63,9 @@
     </div>
 
     <script type="module">
-        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-        import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+        // Reverted to esm.sh to prevent CORS/Module mapping crashes
+        import * as THREE from 'https://esm.sh/three@0.160.0';
+        import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
         // --- Core Scene Setup ---
         const scene = new THREE.Scene();
@@ -74,7 +75,7 @@
         
         const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "low-power" });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        // Performance Fix: Cap pixel ratio to 2 to prevent 4k monitors from melting student GPUs
+        // Performance Fix: Cap pixel ratio to 2
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
         document.body.appendChild(renderer.domElement);
 
@@ -91,9 +92,9 @@
 
         // --- Optimized Geometry & Materials ---
         const grid = 14; 
-        const atomGeom = new THREE.SphereGeometry(0.12, 16, 16); // Restored to 16 segments
+        const atomGeom = new THREE.SphereGeometry(0.12, 16, 16); 
         
-        // CRITICAL FIX: Base material MUST be white to prevent hex colors from muddying.
+        // CRITICAL FIX: Base material MUST be pure white to prevent hex colors from color-shifting.
         const baseMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
 
         const corners = new THREE.InstancedMesh(atomGeom, baseMaterial, (grid+1)**3); 
@@ -148,7 +149,6 @@
             }
         }
         
-        // Push initial color data to GPU
         corners.instanceColor.needsUpdate = true;
         faces.instanceColor.needsUpdate = true;
 
@@ -156,13 +156,12 @@
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        camera.position.set(0, 0, grid * 0.35); // Retained maximum zoom
+        camera.position.set(0, 0, grid * 0.35);
 
         // --- Interactivity ---
         function updatePlanes(h, k, l) {
             atomData.forEach(a => {
                 const val = (a.x * h) + (a.y * k) + (a.z * l);
-                // Tolerance for floating point math
                 const onPlane = Math.abs(val % 1) < 0.03 || Math.abs(val % 1) > 0.97;
                 a.mesh.setColorAt(a.id, onPlane ? YELLOW : a.baseColor);
             });
@@ -207,7 +206,6 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // WASD Manual Flight
             const f = new THREE.Vector3(); camera.getWorldDirection(f);
             const s = new THREE.Vector3().crossVectors(camera.up, f).normalize();
             if (keys['KeyW']) camera.position.addScaledVector(f, 0.1);
