@@ -3,75 +3,129 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FCC Unit Cell</title>
+    <title>MIE 201 - Materials Science</title>
     <style>
-        body { margin: 0; background-color: #000; overflow: hidden; width: 100vw; height: 100vh; }
+        body { margin: 0; background-color: #050505; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; }
+        
+        /* The Overlay Text */
+        #hero-ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            pointer-events: none; /* Allows mouse to click "through" text to the 3D model */
+            text-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        h1 { font-size: 5rem; margin: 0; letter-spacing: 10px; opacity: 0.9; }
+        p { font-size: 1.2rem; text-transform: uppercase; letter-spacing: 4px; opacity: 0.7; }
+        
+        /* Small Instructions */
+        #nav-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
+
+    <div id="hero-ui">
+        <h1>MIE 201</h1>
+        <p>Introduction to Materials Science</p>
+    </div>
+
+    <div id="nav-hint">WASD / Arrows to Move • Mouse to Rotate • Scroll to Zoom</div>
+
     <script type="module">
-        // This pulls Three.js and OrbitControls directly without needing a separate map
         import * as THREE from 'https://esm.sh/three@0.160.0';
         import { OrbitControls } from 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-        // --- Scene Setup ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // --- Lighting ---
-        const light = new THREE.PointLight(0xffffff, 2, 100);
-        light.position.set(5, 5, 5);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        // Lighting
+        const mainLight = new THREE.DirectionalLight(0xffffff, 3);
+        mainLight.position.set(10, 10, 10);
+        scene.add(mainLight);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-        // --- Atoms (FCC) ---
-        const atomGeom = new THREE.SphereGeometry(0.18, 32, 32);
-        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 100 });
-        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 100 });
+        // Materials & Geometry
+        const atomGeom = new THREE.SphereGeometry(0.12, 16, 16);
+        const blueMat = new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 80 });
+        const redMat = new THREE.MeshPhongMaterial({ color: 0xe74c3c, shininess: 80 });
 
-        const corners = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1]];
-        const faces = [[0.5,0.5,0],[0.5,0.5,1],[0.5,0,0.5],[0.5,1,0.5],[0,0.5,0.5],[1,0.5,0.5]];
+        const latticeGroup = new THREE.Group();
 
-        const atomGroup = new THREE.Group();
-        
-        const createAtoms = (list, mat) => {
-            list.forEach(p => {
-                const mesh = new THREE.Mesh(atomGeom, mat);
-                mesh.position.set(p[0]-0.5, p[1]-0.5, p[2]-0.5);
-                atomGroup.add(mesh);
-            });
-        };
+        // Create a 3x3x3 FCC Lattice
+        const gridSize = 3; 
+        for (let x = 0; x <= gridSize; x++) {
+            for (let y = 0; y <= gridSize; y++) {
+                for (let z = 0; z <= gridSize; z++) {
+                    
+                    // 1. Corner Atoms (Blue)
+                    const corner = new THREE.Mesh(atomGeom, blueMat);
+                    corner.position.set(x, y, z);
+                    latticeGroup.add(corner);
 
-        createAtoms(corners, blueMat);
-        createAtoms(faces, redMat);
-        scene.add(atomGroup);
+                    // 2. Face Center Atoms (Red) - Only add if within bounds
+                    if (x < gridSize && y < gridSize) {
+                        const f1 = new THREE.Mesh(atomGeom, redMat);
+                        f1.position.set(x + 0.5, y + 0.5, z);
+                        latticeGroup.add(f1);
+                    }
+                    if (y < gridSize && z < gridSize) {
+                        const f2 = new THREE.Mesh(atomGeom, redMat);
+                        f2.position.set(x, y + 0.5, z + 0.5);
+                        latticeGroup.add(f2);
+                    }
+                    if (x < gridSize && z < gridSize) {
+                        const f3 = new THREE.Mesh(atomGeom, redMat);
+                        f3.position.set(x + 0.5, y, z + 0.5);
+                        latticeGroup.add(f3);
+                    }
+                }
+            }
+        }
 
-        // --- Unit Cell Box ---
-        const box = new THREE.Mesh(
-            new THREE.BoxGeometry(1,1,1), 
-            new THREE.MeshBasicMaterial({color: 0xffffff, wireframe: true, transparent: true, opacity: 0.3})
-        );
-        scene.add(box);
+        // Center the whole group
+        const offset = gridSize / 2;
+        latticeGroup.position.set(-offset, -offset, -offset);
+        scene.add(latticeGroup);
 
-        camera.position.set(1.5, 1.5, 2);
+        camera.position.set(4, 4, 6);
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // --- Animation Loop ---
+        // WASD / Arrow Movement Logic
+        const moveSpeed = 0.1;
+        const keys = {};
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        function handleMovement() {
+            if (keys['KeyW'] || keys['ArrowUp']) camera.position.y += moveSpeed;
+            if (keys['KeyS'] || keys['ArrowDown']) camera.position.y -= moveSpeed;
+            if (keys['KeyA'] || keys['ArrowLeft']) camera.position.x -= moveSpeed;
+            if (keys['KeyD'] || keys['ArrowRight']) camera.position.x += moveSpeed;
+        }
+
         function animate() {
             requestAnimationFrame(animate);
-            atomGroup.rotation.y += 0.005;
-            box.rotation.y += 0.005;
+            handleMovement();
+            latticeGroup.rotation.y += 0.001; // Very slow cinematic spin
             controls.update();
             renderer.render(scene, camera);
         }
-        
-        // --- Responsiveness ---
+
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -79,7 +133,6 @@
         });
 
         animate();
-        console.log("Three.js Scene Initialized Successfully");
     </script>
 </body>
 </html>
